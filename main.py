@@ -6,7 +6,7 @@
 - 提供 `/鸟讯 <城市>` 立即查询、`/刷新城市` 刷新省市列表；
 - 注册 AI 工具 `query_bird_news`，供主 AI 在对话中即时查询。
 
-订阅在 AstrBot 的插件配置面板（`_conf_schema.json`）中填写，城市用下拉列表选择。
+订阅在 AstrBot 的插件配置面板（`_conf_schema.json`）中填写，城市下拉随插件发布。
 """
 
 from __future__ import annotations
@@ -20,11 +20,10 @@ from apscheduler.triggers.cron import CronTrigger
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, MessageChain, MessageEventResult, filter
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star, StarTools, register
 
 from .core import query as query_mod
 from .core import regions as regions_mod
-from .core import schema as schema_mod
 from .core.client import BirdReportClient
 from .core.errors import (
     BirdReportError,
@@ -35,7 +34,7 @@ from .core.errors import (
 
 TZ = ZoneInfo("Asia/Shanghai")
 
-_REGIONS_PATH = Path(__file__).resolve().parent / "data" / "regions.json"
+_BUNDLED_REGIONS_PATH = Path(__file__).resolve().parent / "data" / "regions.json"
 
 _POLISH_SYSTEM_PROMPT = (
     "为观鸟群消息写一句自然的开场白，不超过40个汉字。"
@@ -54,11 +53,12 @@ def _friendly_error(exc: BirdReportError) -> str:
     return f"查询失败：{exc}"
 
 
-@register("astrbot_plugin_birdreport", "如风", "定时推送指定城市过去 24 小时鸟讯", "1.0.3")
+@register("astrbot_plugin_birdreport", "如风", "定时推送指定城市过去 24 小时鸟讯", "1.0.4")
 class BirdReportPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config
+        self._regions_path = StarTools.get_data_dir("astrbot_plugin_birdreport") / "regions.json"
         self._regions: list[dict] = []
         self._scheduler: Optional[AsyncIOScheduler] = None
 
@@ -74,11 +74,13 @@ class BirdReportPlugin(Star):
     # ---- 内部工具 ----
 
     def _load_regions(self):
-        try:
-            self._regions = regions_mod.load_regions(_REGIONS_PATH)
-        except (FileNotFoundError, InvalidFilterError, ValueError) as exc:
-            logger.warning(f"regions.json 不可用，稍后可用 /刷新城市 生成：{exc}")
-            self._regions = []
+        for path in (self._regions_path, _BUNDLED_REGIONS_PATH):
+            try:
+                self._regions = regions_mod.load_regions(path)
+                return
+            except (FileNotFoundError, InvalidFilterError, ValueError) as exc:
+                logger.warning(f"城市列表 {path} 不可用：{exc}")
+        self._regions = []
 
     def _build_scheduler(self):
         if self._scheduler is not None:
@@ -212,19 +214,18 @@ class BirdReportPlugin(Star):
 
     @filter.command("刷新城市")
     async def refresh_cities(self, event: AstrMessageEvent) -> MessageEventResult:
-        """重新从 birdreport 拉取省市列表并更新配置面板下拉（管理员用）。"""
+        """重新从 birdreport 拉取省市列表并更新运行时缓存（管理员用）。"""
         client = BirdReportClient(timeout=25)
         try:
-            regions = await regions_mod.build_regions(client)
+            regions = await regions_mod.build_regions(client, self._regions_path)
         except Exception as exc:
             yield event.plain_result(f"刷新失败：{exc}")
             return
         finally:
             await client.close()
-        schema_mod.write_schema([r["name"] for r in regions])
         self._regions = regions
         yield event.plain_result(
-            f"已刷新 {len(regions)} 个城市。请「重载插件」以更新配置面板的城市下拉。"
+            f"已刷新 {len(regions)} 个城市，查询与订阅立即生效；配置面板的城市下拉随插件版本更新。"
         )
 
     # ---- AI 工具 ----

@@ -3,7 +3,7 @@ display_name: 鸟讯查询
 author: 如风
 desc: 定时向指定 QQ 群/QQ 推送指定城市过去 24 小时鸟讯（数据来自中国观鸟记录中心，可由ASTRBOT主 AI 生成导语）
 short_desc: 定时推送分地点鸟讯，支持主 AI 导语
-version: 1.0.3
+version: 1.0.4
 # 发布到插件市场前，请把 repo 改成你的实际仓库地址，例如 https://github.com/<用户名>/astrbot_plugin_birdreport
 repo: "https://github.com/breeze0424/astrbot_plugin_birdreport"
 support_platforms:

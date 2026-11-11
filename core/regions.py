@@ -23,9 +23,6 @@ from .errors import InvalidFilterError
 # 直辖市 + 特别行政区：城市名 == 省名，查询时 city 置空
 _DIRECT_MUNICIPALITIES = {"北京市", "天津市", "上海市", "重庆市", "香港", "澳门"}
 
-_DEFAULT_REGIONS_PATH = Path(__file__).resolve().parent.parent / "data" / "regions.json"
-
-
 def _is_keepable_city(city_code: str) -> bool:
     """地级行政区划代码以 00 结尾；排除新疆兵团市(659xxx，属县级市)。"""
     return city_code.endswith("00") and not city_code.startswith("659")
@@ -96,7 +93,7 @@ def save_regions(path: Path, regions: list[dict]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def load_regions(path: Path = _DEFAULT_REGIONS_PATH) -> list[dict]:
+def load_regions(path: Path) -> list[dict]:
     """读取缓存的城市列表。文件缺失时抛 FileNotFoundError，由调用方回退到抓取。"""
     payload = json.loads(path.read_text(encoding="utf-8"))
     cities = payload.get("cities")
@@ -105,7 +102,7 @@ def load_regions(path: Path = _DEFAULT_REGIONS_PATH) -> list[dict]:
     return cities
 
 
-async def build_regions(client: BirdReportClient, path: Path = _DEFAULT_REGIONS_PATH) -> list[dict]:
+async def build_regions(client: BirdReportClient, path: Path) -> list[dict]:
     """抓取 + 过滤 + 落盘，返回城市列表。"""
     regions = await fetch_regions(client)
     save_regions(path, regions)

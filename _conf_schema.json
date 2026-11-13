@@ -5,6 +5,13 @@
     "_special": "select_provider",
     "default": ""
   },
+  "ebird_api_key": {
+    "description": "eBird API Key（备用数据源；请填写你自己的 Key）",
+    "type": "string",
+    "default": "",
+    "secret": true,
+    "hint": "观鸟记录中心查询失败时自动切换 eBird。留空则不启用备用源；Key 仅在配置界面遮罩，仍以原文保存在 AstrBot 配置文件中。"
+  },
   "subscriptions": {
     "description": "鸟讯订阅：在指定时间，向指定 QQ 群 / QQ（私聊）发送指定城市过去 24 小时的鸟讯。",
     "type": "template_list",

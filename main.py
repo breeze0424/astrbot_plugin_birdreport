@@ -25,6 +25,7 @@ from astrbot.api.star import Context, Star, StarTools, register
 from .core import query as query_mod
 from .core import regions as regions_mod
 from .core.client import BirdReportClient
+from .core.sources import get_with_fallback
 from .core.errors import (
     BirdReportError,
     EmptyResult,
@@ -53,7 +54,7 @@ def _friendly_error(exc: BirdReportError) -> str:
     return f"查询失败：{exc}"
 
 
-@register("astrbot_plugin_birdreport", "如风", "定时推送指定城市过去 24 小时鸟讯", "1.0.4")
+@register("astrbot_plugin_birdreport", "如风", "定时推送指定城市过去 24 小时鸟讯", "1.1.0")
 class BirdReportPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -134,8 +135,14 @@ class BirdReportPlugin(Star):
 
     async def _fetch_result(self, province: str, city: str, hours: int = 24) -> dict:
         client = BirdReportClient(timeout=25)
+        api_key = str(self.config.get("ebird_api_key") or "").strip()
+        city_name = next((r["name"] for r in self._regions
+                          if r["province"] == province and r["city"] == city), city or province)
         try:
-            return await query_mod.get_bird_news(client, province, city, hours=hours)
+            result = await get_with_fallback(client, province, city, city_name, api_key, hours)
+            if result.get("source") == "ebird":
+                logger.warning(f"观鸟记录中心不可用，已切换 eBird（{city_name}）")
+            return result
         finally:
             await client.close()
 

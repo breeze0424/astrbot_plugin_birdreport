@@ -253,12 +253,13 @@ def _place_lines(result: dict) -> list[str]:
                 species_places[key].add(place)
         per_place[place] = species
 
+    unit = "条" if result.get("source") == "ebird" else "篇"
     lines = []
     for place in places:
         group = groups[place]
         read = sum(bool(r.get("details_fetched")) for r in group)
         label = place if len(place) <= 80 else place[:79] + "…"
-        prefix = f"{label}（{len(group)}篇）"
+        prefix = f"{label}（{len(group)}{unit}）"
         if not read:
             lines.append(prefix + "：鸟种明细未获取。")
             continue
@@ -274,7 +275,7 @@ def _place_lines(result: dict) -> list[str]:
         if other:
             line += f"；另有{other}种"
         if read < len(group):
-            line += f"（已读{read}/{len(group)}篇详情，鸟种数仅含已读报告）"
+            line += f"（已读{read}/{len(group)}{unit}详情，鸟种数仅含已读记录）"
         lines.append(line + "。")
     return lines
 
@@ -287,10 +288,16 @@ def format_messages(
     total = result.get("total", len(result["reports"]))
     place_total = result.get("place_total", len(result.get("selected_places", [])))
     shown = len(result.get("selected_places", []))
-    header = (f"{city_label}鸟讯｜{result['window_start']}—{result['window_end']}\n"
-              f"中国观鸟记录中心公开报告{total}篇；展示{shown}/{place_total}处地点。")
+    if result.get("source") == "ebird":
+        header = (f"{city_label}周边鸟讯｜{result['window_start']}—{result['window_end']}\n"
+                  f"来源：eBird（康奈尔鸟类学实验室）；市中心周边50公里最近观测{total}条，"
+                  f"展示{shown}/{place_total}处地点。数据为近期摘要，非全市完整报告。")
+    else:
+        header = (f"{city_label}鸟讯｜{result['window_start']}—{result['window_end']}\n"
+                  f"中国观鸟记录中心公开报告{total}篇；展示{shown}/{place_total}处地点。")
     if not result["reports"]:
-        return [header + "\n该时段暂无公开报告。"]
+        ending = "\n该时段未获取到近期观测记录。" if result.get("source") == "ebird" else "\n该时段暂无公开报告。"
+        return [header + ending]
     intro = " ".join(intro.split())[:80]
     lines = _place_lines(result)
     chunks: list[list[str]] = []
